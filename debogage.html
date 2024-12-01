@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Convertisseur de Texte en Formulaire</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { padding-top: 50px; }
+        .form-group { margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">Convertisseur de Texte en Formulaire</h1>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="textInput">Collez votre texte ici :</label>
+                    <textarea id="textInput" class="form-control" rows="6" placeholder="Entrez votre texte..."></textarea>
+                </div>
+                <button id="convertBtn" class="btn btn-primary mb-3">Convertir</button>
+                
+                <div id="formContainer"></div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="generatedText">Texte Généré :</label>
+                    <textarea id="generatedText" class="form-control" rows="10" readonly></textarea>
+                </div>
+                <button id="generateBtn" class="btn btn-success" style="display:none;">Générer le Texte</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const textInput = document.getElementById('textInput');
+            const convertBtn = document.getElementById('convertBtn');
+            const formContainer = document.getElementById('formContainer');
+            const generateBtn = document.getElementById('generateBtn');
+            const generatedText = document.getElementById('generatedText');
+
+            convertBtn.addEventListener('click', function() {
+                // Nettoyer le conteneur de formulaire
+                formContainer.innerHTML = '';
+                generateBtn.style.display = 'none';
+                generatedText.value = '';
+
+                // Récupérer les lignes du texte
+                const lines = textInput.value.split('\n').filter(line => line.trim() !== '');
+
+                // Créer un formulaire dynamique
+                lines.forEach((line) => {
+                    const formGroup = document.createElement('div');
+                    formGroup.className = 'form-group mb-3';
+                    
+                    const originalText = document.createElement('p');
+                    originalText.textContent = line;
+                    originalText.className = 'mb-1 fw-bold';
+                    
+                    const textarea = document.createElement('textarea');
+                    textarea.className = 'form-control';
+                    textarea.rows = 2;
+                    textarea.placeholder = 'Votre réponse (optionnelle)';
+                    
+                    formGroup.appendChild(originalText);
+                    formGroup.appendChild(textarea);
+                    
+                    formContainer.appendChild(formGroup);
+                });
+
+                // Afficher le bouton de génération
+                generateBtn.style.display = 'block';
+            });
+
+            generateBtn.addEventListener('click', function() {
+                const lines = textInput.value.split('\n').filter(line => line.trim() !== '');
+                const textareas = formContainer.querySelectorAll('textarea');
+                
+                // Générer le texte final
+                const generatedLines = lines.map((line, index) => {
+                    const responseValue = textareas[index].value.trim();
+                    return responseValue ? `${line} ${responseValue}` : line + ' ';
+                });
+                
+                generatedText.value = generatedLines.join('\n');
+            });
+        });
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

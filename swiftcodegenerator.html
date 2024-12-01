@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwiftUI Builder</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .draggable { 
+            cursor: move; 
+            padding: 10px; 
+            margin: 5px; 
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+        }
+        .droppable { 
+            min-height: 100px; 
+            border: 2px dashed #ccc; 
+            padding: 10px; 
+            margin: 10px 0; 
+            position: relative;
+        }
+        #preview { 
+            background-color: #f0f0f0; 
+            min-height: 400px; 
+            padding: 20px; 
+            border-radius: 20px; 
+        }
+        #code-output { 
+            white-space: pre-wrap; 
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .nested-container {
+            border: 1px dashed #999;
+            margin: 5px;
+            padding: 10px;
+        }
+        .element-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 5px;
+        }
+        .element-icon {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+
+        /* Color coding for different elements */
+        .draggable[data-type="ZStack"] { background-color: #e6f2ff; }
+        .draggable[data-type="VStack"] { background-color: #e6ffe6; }
+        .draggable[data-type="HStack"] { background-color: #fff2e6; }
+        .draggable[data-type="Text"] { background-color: #f0e6ff; }
+        .draggable[data-type="Image"] { background-color: #e6fff2; }
+        .draggable[data-type="Button"] { background-color: #fff0e6; }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-4">
+                <h3>📱 Éléments SwiftUI</h3>
+                <div id="elements">
+                    <div class="draggable" draggable="true" data-type="ZStack">
+                        <span class="element-icon">🗂️</span> ZStack
+                    </div>
+                    <div class="draggable" draggable="true" data-type="VStack">
+                        <span class="element-icon">📊</span> VStack
+                    </div>
+                    <div class="draggable" draggable="true" data-type="HStack">
+                        <span class="element-icon">📈</span> HStack
+                    </div>
+                    <div class="draggable" draggable="true" data-type="Text">
+                        <span class="element-icon">✏️</span> Text
+                    </div>
+                    <div class="draggable" draggable="true" data-type="Image">
+                        <span class="element-icon">🖼️</span> Image
+                    </div>
+                    <div class="draggable" draggable="true" data-type="Button">
+                        <span class="element-icon">🔘</span> Button
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <h3>🖥️ Aperçu</h3>
+                <div id="preview" class="droppable"></div>
+            </div>
+            <div class="col-md-4">
+                <h3>📝 Code SwiftUI généré</h3>
+                <pre id="code-output"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let elementCounter = {
+            ZStack: 0,
+            VStack: 0,
+            HStack: 0,
+            Text: 0,
+            Image: 0,
+            Button: 0
+        };
+
+        function createElementWithControls(type) {
+            const container = document.createElement('div');
+            container.classList.add('draggable', 'nested-container');
+            container.draggable = true;
+            container.dataset.type = type;
+
+            const elementText = document.createElement('div');
+            elementText.textContent = `${type} ${++elementCounter[type]}`;
+            container.appendChild(elementText);
+
+            const controls = document.createElement('div');
+            controls.classList.add('element-controls');
+
+            // Add content button
+            const contentBtn = document.createElement('button');
+            contentBtn.textContent = '📝 Contenu';
+            contentBtn.classList.add('btn', 'btn-sm', 'btn-outline-primary');
+            contentBtn.onclick = () => {
+                const content = prompt(`Entrez le contenu pour ${type}:`);
+                if (content) {
+                    elementText.dataset.content = content;
+                    updateCode();
+                }
+            };
+            controls.appendChild(contentBtn);
+
+            // Delete button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '🗑️ Supprimer';
+            deleteBtn.classList.add('btn', 'btn-sm', 'btn-outline-danger');
+            deleteBtn.onclick = () => {
+                container.remove();
+                updateCode();
+            };
+            controls.appendChild(deleteBtn);
+
+            container.appendChild(controls);
+
+            container.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', JSON.stringify({
+                    type: type,
+                    content: container.dataset.content || ''
+                }));
+            });
+
+            return container;
+        }
+
+        document.querySelectorAll('.draggable').forEach(draggable => {
+            draggable.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', JSON.stringify({
+                    type: e.target.dataset.type,
+                    content: ''
+                }));
+            });
+        });
+
+        document.querySelector('#preview').addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        document.querySelector('#preview').addEventListener('drop', (e) => {
+            e.preventDefault();
+            const dropTarget = e.target.closest('.droppable, .nested-container') || e.target;
+            const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+            const element = createElementWithControls(data.type);
+            
+            if (data.content) {
+                element.dataset.content = data.content;
+            }
+
+            dropTarget.appendChild(element);
+            updateCode();
+        });
+
+        function updateCode() {
+            const codeOutput = document.getElementById('code-output');
+            const preview = document.getElementById('preview');
+
+            let code = `import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        ZStack {
+`;
+
+            function generateCodeRecursive(element, indent = 3) {
+                const indentStr = ' '.repeat(indent * 4);
+                const type = element.dataset.type;
+                const content = element.dataset.content || '';
+
+                let elementCode = `${indentStr}${type} {\n`;
+
+                // Add content if specified
+                if (content) {
+                    if (type === 'Text') {
+                        elementCode += `${indentStr}    Text("${content}")\n`;
+                    } else if (type === 'Button') {
+                        elementCode += `${indentStr}    Button("${content}") {\n${indentStr}        // Action\n${indentStr}    }\n`;
+                    } else if (type === 'Image') {
+                        elementCode += `${indentStr}    Image("${content}")\n`;
+                    }
+                }
+
+                // Recursively handle nested elements
+                const nestedElements = element.querySelectorAll(':scope > .nested-container');
+                nestedElements.forEach(nested => {
+                    elementCode += generateCodeRecursive(nested, indent + 1);
+                });
+
+                elementCode += `${indentStr}}\n`;
+                return elementCode;
+            }
+
+            // Generate code for all top-level elements
+            preview.querySelectorAll(':scope > .nested-container').forEach(element => {
+                code += generateCodeRecursive(element);
+            });
+
+            code += `        }
+    }
+}`;
+
+            codeOutput.textContent = code;
+        }
+    </script>
+</body>
+</html>

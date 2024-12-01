@@ -1,0 +1,310 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lecteur de Sous-titres Avancé</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        .subtitle-frame {
+            height: 100px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 20px;
+            font-size: 18px;
+            line-height: 1.5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        #controls {
+            margin-top: 20px;
+        }
+        .nav-buttons {
+            font-size: 24px;
+        }
+        #progressBarContainer {
+            margin-top: 20px;
+        }
+        #progressBar {
+            width: 100%;
+            height: 5px;
+        }
+        .language-select {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="mb-4">Lecteur de Sous-titres Avancé</h1>
+        
+        <div class="mb-3">
+            <label for="subtitleFile" class="form-label">Télécharger le fichier de sous-titres (.srt, .txt)</label>
+            <input class="form-control" type="file" id="subtitleFile" accept=".srt,.txt">
+        </div>
+        
+        <div class="mb-3">
+            <label for="translationFile" class="form-label">Télécharger le fichier de traduction (.srt, .txt)</label>
+            <input class="form-control" type="file" id="translationFile" accept=".srt,.txt">
+        </div>
+        
+        <div class="row language-select">
+            <div class="col-md-6">
+                <label for="originalLanguage" class="form-label">Langue du fichier original</label>
+                <select id="originalLanguage" class="form-select">
+                    <option value="en-US">Anglais (US)</option>
+                    <option value="fr-FR">Français</option>
+                    <option value="es-ES">Espagnol</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label for="translationLanguage" class="form-label">Langue de traduction</label>
+                <select id="translationLanguage" class="form-select">
+                    <option value="fr-FR">Français</option>
+                    <option value="en-US">Anglais (US)</option>
+                    <option value="es-ES">Espagnol</option>
+                </select>
+            </div>
+        </div>
+        
+        <div id="originalSubtitleFrame" class="subtitle-frame bg-light"></div>
+        <div id="translatedSubtitleFrame" class="subtitle-frame bg-light mt-2"></div>
+        
+        <div id="controls" class="mt-3">
+            <button id="prevBtn" class="btn btn-outline-secondary nav-buttons" disabled>
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            <button id="startBtn" class="btn btn-primary" disabled>Démarrer</button>
+            <button id="pauseBtn" class="btn btn-secondary" disabled>Pause</button>
+            <button id="resetBtn" class="btn btn-danger" disabled>Réinitialiser</button>
+            <button id="nextBtn" class="btn btn-outline-secondary nav-buttons" disabled>
+                <i class="bi bi-chevron-right"></i>
+            </button>
+            <button id="repeatBtn" class="btn btn-info" disabled>Répéter</button>
+            <button id="speakOriginalBtn" class="btn btn-warning" disabled>Lire original</button>
+            <button id="speakTranslationBtn" class="btn btn-warning" disabled>Lire traduction</button>
+        </div>
+        
+        <div id="progressBarContainer">
+            <input type="range" class="form-range" id="progressBar" value="0" step="1" disabled>
+        </div>
+        
+        <div class="mt-3">
+            <label for="speedRange" class="form-label">Vitesse d'affichage: <span id="speedValue">1</span>x</label>
+            <input type="range" class="form-range" id="speedRange" min="0.5" max="2" step="0.1" value="1">
+        </div>
+    </div>
+
+    <script>
+        let subtitles = [];
+        let translations = [];
+        let currentIndex = 0;
+        let intervalId = null;
+        let speed = 1;
+
+        // DOM Elements
+        const originalSubtitleFrame = document.getElementById('originalSubtitleFrame');
+        const translatedSubtitleFrame = document.getElementById('translatedSubtitleFrame');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const repeatBtn = document.getElementById('repeatBtn');
+        const speakOriginalBtn = document.getElementById('speakOriginalBtn');
+        const speakTranslationBtn = document.getElementById('speakTranslationBtn');
+        const speedRange = document.getElementById('speedRange');
+        const speedValue = document.getElementById('speedValue');
+        const progressBar = document.getElementById('progressBar');
+        const originalLanguage = document.getElementById('originalLanguage');
+        const translationLanguage = document.getElementById('translationLanguage');
+
+        // Event Listeners
+        document.getElementById('subtitleFile').addEventListener('change', handleFileUpload);
+        document.getElementById('translationFile').addEventListener('change', handleTranslationFileUpload);
+        startBtn.addEventListener('click', startDisplay);
+        pauseBtn.addEventListener('click', pauseDisplay);
+        resetBtn.addEventListener('click', resetDisplay);
+        prevBtn.addEventListener('click', showPreviousSubtitle);
+        nextBtn.addEventListener('click', showNextSubtitle);
+        repeatBtn.addEventListener('click', repeatSubtitle);
+        speakOriginalBtn.addEventListener('click', () => speakSubtitle(true));
+        speakTranslationBtn.addEventListener('click', () => speakSubtitle(false));
+        speedRange.addEventListener('input', updateSpeed);
+        progressBar.addEventListener('input', seekToPosition);
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const content = e.target.result;
+                subtitles = parseSubtitleFile(content);
+                enableButtons();
+                currentIndex = 0;
+                originalSubtitleFrame.textContent = subtitles[0] || "Aucun sous-titre";
+                progressBar.max = subtitles.length - 1;
+                progressBar.disabled = false;
+                updateNavigationButtons();
+            };
+
+            reader.readAsText(file);
+        }
+
+        function handleTranslationFileUpload(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const content = e.target.result;
+                translations = parseSubtitleFile(content);
+                if (translations.length > 0) {
+                    translatedSubtitleFrame.textContent = translations[0] || "Aucune traduction";
+                }
+                updateNavigationButtons();
+            };
+
+            reader.readAsText(file);
+        }
+
+        function parseSubtitleFile(content) {
+            const subtitles = [];
+            const lines = content.split('\n');
+            let currentSubtitle = '';
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line === '') {
+                    if (currentSubtitle !== '') {
+                        subtitles.push(currentSubtitle.trim());
+                        currentSubtitle = '';
+                    }
+                } else if (!line.includes('-->')) {
+                    currentSubtitle += line + ' ';
+                }
+            }
+
+            if (currentSubtitle !== '') {
+                subtitles.push(currentSubtitle.trim());
+            }
+
+            return subtitles;
+        }
+
+        function startDisplay() {
+            startBtn.disabled = true;
+            pauseBtn.disabled = false;
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+            if (intervalId) clearInterval(intervalId);
+            intervalId = setInterval(displayNextSubtitle, 2000 / speed);
+        }
+
+        function pauseDisplay() {
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            prevBtn.disabled = false;
+            nextBtn.disabled = false;
+            if (intervalId) clearInterval(intervalId);
+        }
+
+        function resetDisplay() {
+            if (intervalId) clearInterval(intervalId);
+            currentIndex = 0;
+            originalSubtitleFrame.textContent = subtitles[0] || "Prêt à démarrer";
+            translatedSubtitleFrame.textContent = translations[0] || "";
+            progressBar.value = 0;
+            enableButtons();
+        }
+
+        function displayNextSubtitle() {
+            if (currentIndex < subtitles.length - 1) {
+                currentIndex++;
+                updateSubtitleDisplay();
+            } else {
+                clearInterval(intervalId);
+                disableButtons();
+                prevBtn.disabled = false;
+            }
+        }
+
+        function updateSubtitleDisplay() {
+            originalSubtitleFrame.textContent = subtitles[currentIndex] || "";
+            translatedSubtitleFrame.textContent = translations[currentIndex] || "";
+            progressBar.value = currentIndex;
+            updateNavigationButtons();
+        }
+
+        function showPreviousSubtitle() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateSubtitleDisplay();
+            }
+        }
+
+        function showNextSubtitle() {
+            if (currentIndex < subtitles.length - 1) {
+                currentIndex++;
+                updateSubtitleDisplay();
+            }
+        }
+
+        function repeatSubtitle() {
+            updateSubtitleDisplay();
+        }
+
+        function speakSubtitle(isOriginal) {
+            const subtitle = isOriginal ? originalSubtitleFrame.textContent : translatedSubtitleFrame.textContent;
+            const language = isOriginal ? originalLanguage.value : translationLanguage.value;
+
+            if (subtitle) {
+                const utterance = new SpeechSynthesisUtterance(subtitle);
+                utterance.lang = language;
+                speechSynthesis.speak(utterance);
+            }
+        }
+
+        function updateSpeed() {
+            speed = parseFloat(speedRange.value);
+            speedValue.textContent = speed.toFixed(1);
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = setInterval(displayNextSubtitle, 2000 / speed);
+            }
+        }
+
+        function enableButtons() {
+            startBtn.disabled = false;
+            prevBtn.disabled = false;
+            nextBtn.disabled = false;
+            repeatBtn.disabled = false;
+            speakOriginalBtn.disabled = false;
+            speakTranslationBtn.disabled = false;
+        }
+
+        function disableButtons() {
+            startBtn.disabled = true;
+            pauseBtn.disabled = true;
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+            repeatBtn.disabled = true;
+            speakOriginalBtn.disabled = true;
+            speakTranslationBtn.disabled = true;
+        }
+
+        function updateNavigationButtons() {
+            prevBtn.disabled = currentIndex === 0;
+            nextBtn.disabled = currentIndex === subtitles.length - 1;
+        }
+
+        function seekToPosition() {
+            currentIndex = parseInt(progressBar.value);
+            updateSubtitleDisplay();
+        }
+    </script>
+</body>
+</html>

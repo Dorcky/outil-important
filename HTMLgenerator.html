@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interface Générateur HTML</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <style>
+        #background-image {
+            position: relative;
+            width: 100%;
+            height: 1200px;
+            border: 1px solid #ccc;
+            background-size: cover;
+            overflow: hidden;
+        }
+        .custom-div {
+            position: absolute;
+            border: 2px solid #000;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        .grid-container {
+            display: grid;
+            gap: 10px;
+        }
+        .grid-item {
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid black;
+            padding: 20px;
+            text-align: center;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes zoomIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-30px); }
+            60% { transform: translateY(-15px); }
+        }
+        .selected {
+            outline: 3px solid blue;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h2>Créateur d'interface</h2>
+        
+        <div class="mb-3">
+            <label for="bgImage" class="form-label">Télécharger une image de fond</label>
+            <input type="file" class="form-control" id="bgImage">
+        </div>
+        
+        <div id="background-image"></div>
+
+        <div class="mt-4">
+            <button class="btn btn-primary mb-3" onclick="addDiv()">Ajouter une div</button>
+            <button class="btn btn-secondary mb-3" onclick="addText()">Ajouter un texte</button>
+            <button class="btn btn-info mb-3" onclick="insertTable()">Insérer un tableau</button>
+            <button class="btn btn-warning mb-3" onclick="addImage()">Ajouter une image</button>
+            <button class="btn btn-success mb-3" onclick="addGrid()">Ajouter une grille</button>
+            <button class="btn btn-danger mb-3" onclick="addForm()">Ajouter un formulaire</button>
+
+            <div class="row mt-3">
+                <div class="col-md-3">
+                    <label for="bgColor" class="form-label">Couleur de fond</label>
+                    <input type="color" class="form-control" id="bgColor" value="#ffffff">
+                </div>
+                <div class="col-md-3">
+                    <label for="borderColor" class="form-label">Couleur de la bordure</label>
+                    <input type="color" class="form-control" id="borderColor" value="#000000">
+                </div>
+                <div class="col-md-3">
+                    <label for="borderWidth" class="form-label">Épaisseur de la bordure</label>
+                    <input type="number" class="form-control" id="borderWidth" value="2" min="1">
+                </div>
+                <div class="col-md-3">
+                    <label for="animation" class="form-label">Animation</label>
+                    <select class="form-control" id="animation">
+                        <option value="">Aucune</option>
+                        <option value="fadeIn">Fade In</option>
+                        <option value="zoomIn">Zoom In</option>
+                        <option value="bounce">Bounce</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Buttons for actions -->
+            <button class="btn btn-success mt-3" onclick="generateHTML()">Générer le HTML</button>
+            <button class="btn btn-primary mt-3" onclick="saveProject()">Sauvegarder le projet</button>
+            <button class="btn btn-secondary mt-3" onclick="loadProject()">Charger un projet</button>
+
+            <!-- Action buttons for selected element -->
+            <button class="btn btn-danger mt-3" id="deleteBtn" style="display: none;">Supprimer l'élément</button>
+        </div>
+
+        <!-- Display generated code -->
+        <pre id="generatedCode" class="mt-3 p-3 bg-light border"></pre>
+    </div>
+
+    <!-- Text editor modal -->
+    <div class="modal fade" id="textEditorModal" tabindex="-1" aria-labelledby="textEditorLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="textEditorLabel">Éditeur de texte</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="editor" style="height: 300px;"></div>
+                </div>
+                <div class='modal-footer'>
+                    <button type='button' class='btn btn-primary' onclick='saveText()'>Sauvegarder</button>
+                    <button type='button' class='btn btn-secondary' data-bs-dismiss='modal'>Fermer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript libraries -->
+    <script src='https://code.jquery.com/jquery-3.6.0.min.js'></script>
+    <script src='https://code.jquery.com/ui/1.13.2/jquery-ui.min.js'></script>
+    <script src='https://cdn.quilljs.com/1.3.6/quill.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'></script>
+
+    <!-- JavaScript functionality -->
+    <script>
+        let activeDiv = null;
+        const quill = new Quill('#editor', {
+            theme: 'snow',
+            modules: {
+                toolbar: [
+                    [{ 'header': [1, 2, false] }],
+                    ['bold', 'italic', 'underline'],
+                    [{ 'color': [] }],
+                    [{ 'background': [] }],
+                    [{ 'size': ['small', false, 'large', 'huge'] }],
+                    [{ 'align': [] }],
+                    ['link', 'image'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    ['clean']
+                ]
+            }
+        });
+
+        document.getElementById('bgImage').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('background-image').style.backgroundImage = 'url(' + e.target.result + ')';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        function addDiv() {
+            const div = document.createElement('div');
+            div.className = 'custom-div';
+            div.style.width = '100px';
+            div.style.height = '100px';
+            div.style.top = Math.random() * 300 + 'px';
+            div.style.left = Math.random() * 500 + 'px';
+            
+			applyStyles(div);
+			document.getElementById('background-image').appendChild(div);
+
+			div.onclick = function(event) {
+				event.stopPropagation();
+				selectElement(div);
+			};
+
+			$(div).draggable({ containment: "#background-image"}).resizable();
+		}
+
+		function addText() {
+			const div = document.createElement('div');
+			div.className = 'custom-div';
+			div.style.width = '200px';
+			div.style.height = '50px';
+			div.style.top = Math.random() * 300 + 'px';
+			div.style.left = Math.random() * 500 + 'px';
+			
+			applyStyles(div);
+			div.innerHTML = '<p>Texte personnalisé</p>';
+			document.getElementById('background-image').appendChild(div);
+
+			div.onclick = function(event) {
+				event.stopPropagation();
+				selectElement(div);
+				quill.root.innerHTML = div.innerHTML;
+				$('#textEditorModal').modal('show');
+			};
+
+			$(div).draggable({ containment: "#background-image"}).resizable();
+		}
+
+		function insertTable() {
+			const rows = prompt("Combien de lignes ?", 2);
+			const cols = prompt("Combien de colonnes ?", 2);
+			if (rows && cols) {
+				const table = document.createElement('table');
+				for (let i = 0; i < rows; i++) {
+					const row = table.insertRow();
+					for (let j = 0; j < cols; j++) {
+						const cell = row.insertCell();
+						cell.innerHTML = `Cellule ${i + 1}, ${j + 1}`;
+					}
+				}
+				const div = document.createElement('div');
+				div.className = 'custom-div';
+				div.style.width = '300px';
+				div.style.height = '200px';
+				div.style.top = Math.random() * 300 + 'px';
+				div.style.left = Math.random() * 500 + 'px';
+
+				applyStyles(div);
+				div.appendChild(table);
+				document.getElementById('background-image').appendChild(div);
+
+				div.onclick = function(event) {
+					event.stopPropagation();
+					selectElement(div);
+				};
+
+				$(div).draggable({ containment: "#background-image"}).resizable();
+			}
+		}
+
+		function addImage() {
+			const input = document.createElement('input');
+			input.type = 'file';
+			input.accept = 'image/*';
+			input.onchange = function(event) {
+				const file = event.target.files[0];
+				const reader = new FileReader();
+				reader.onload = function(e) {
+					const img = document.createElement('img');
+					img.src = e.target.result;
+					img.style.maxWidth = '100%';
+					img.style.maxHeight = '100%';
+					const div = document.createElement('div');
+					div.className = 'custom-div';
+					div.style.width = '200px';
+					div.style.height = '200px';
+					div.style.top = Math.random() * 300 + 'px';
+					div.style.left = Math.random() * 500 + 'px';
+
+					applyStyles(div);
+					div.appendChild(img);
+					document.getElementById('background-image').appendChild(div);
+
+					div.onclick = function(event) {
+						event.stopPropagation();
+						selectElement(div);
+					};
+
+					$(div).draggable({ containment: "#background-image"}).resizable();
+				};
+				reader.readAsDataURL(file);
+			};
+			input.click();
+		}
+
+		function addGrid() {
+			const cols = prompt("Combien de colonnes ?", 3);
+			if (cols) {
+				const div = document.createElement('div');
+				div.className = 'custom-div grid-container';
+				div.style.width = '80%';
+				div.style.height = '300px';
+				div.style.top = Math.random() * 300 + 'px';
+				div.style.left = Math.random() * 500 + 'px';
+				div.style.gridTemplateColumns= `repeat(${cols}, 1fr)`;
+
+				applyStyles(div);
+
+				for (let i=0; i<cols; i++) {
+					const gridItem= document.createElement('div');
+					gridItem.className= "grid-item";
+					gridItem.textContent= `Colonne ${i+1}`;
+					div.appendChild(gridItem);
+				}
+
+				document.getElementById('background-image').appendChild(div);
+
+				div.onclick= function(event) {
+					event.stopPropagation();
+					selectElement(div);
+				};
+
+             $(div).draggable({ containment:"#background-image"}).resizable();
+         }
+     }
+
+     function addForm() {
+         const div= document.createElement('div');
+         div.className= "custom-div";
+         div.style.width= "300px";
+         div.style.height= "auto";
+         div.style.top= Math.random()*300 + "px";
+         div.style.left= Math.random()*500 + "px";
+
+         applyStyles(div);
+
+         const form= document.createElement('form');
+         form.innerHTML= `
+             <div class='mb-3'>
+                 <label for='name' class='form-label'>Nom</label>
+                 <input type='text' class='form-control' id='name' placeholder='Votre nom'>
+             </div>
+             <div class='mb-3'>
+                 <label for='email' class='form-label'>Email</label>
+                 <input type='email' class='form-control' id='email' placeholder='votre@email.com'>
+             </div>
+             <div class='mb-3'>
+                 <label for='message' class='form-label'>Message</label>
+                 <textarea class='form-control' id='message' rows='3'></textarea>
+             </div>
+             <button type='submit' class='btn btn-primary'>Envoyer</button>`;
+
+         div.appendChild(form);
+         document.getElementById('background-image').appendChild(div);
+
+         div.onclick= function(event) {
+             event.stopPropagation();
+             selectElement(div);
+         };
+
+         $(div).draggable({ containment:"#background-image"}).resizable();
+     }
+
+     function applyStyles(element) {
+         const bgColor= document.getElementById('bgColor').value;
+         const borderColor= document.getElementById('borderColor').value;
+         const borderWidth= document.getElementById('borderWidth').value;
+         const animation= document.getElementById('animation').value;
+
+         element.style.backgroundColor= bgColor;
+         element.style.borderColor= borderColor;
+         element.style.borderWidth= borderWidth + "px";
+
+         if(animation){
+             element.style.animation= `${animation} 1s`;
+         }
+     }
+
+     function selectElement(element) {
+         if(activeDiv){
+             activeDiv.classList.remove("selected");
+         }
+
+         activeDiv= element;
+         activeDiv.classList.add("selected");
+         
+          // Show delete button
+          document.getElementById("deleteBtn").style.display= "inline-block";
+     }
+
+     // Delete selected element
+     document.getElementById("deleteBtn").addEventListener("click", function(){
+          if(activeDiv){
+              activeDiv.remove();
+              activeDiv= null; 
+              this.style.display= "none"; 
+          }
+      });
+
+      // Handle clicks outside to deselect
+      document.getElementById("background-image").addEventListener("click", function(event){
+          if(event.target===this){
+              if(activeDiv){
+                  activeDiv.classList.remove("selected");
+              }
+
+              activeDiv= null; 
+              this.querySelector("#deleteBtn").style.display= "none"; 
+          }
+      });
+
+      // Generate HTML code
+      function generateHTML(){
+          const container= document.getElementById("background-image");
+          const code= container.innerHTML.trim(); 
+          const style= document.querySelector("style").innerHTML; 
+          const generatedCode=`<div id='background-image' style='background-image:${container.style.backgroundImage};'>${code}</div>\n<style>\n${style}\n</style>`;
+          
+          document.getElementById("generatedCode").textContent= generatedCode; 
+      }
+
+      // Save project
+      function saveProject(){
+          const container=document.getElementById("background-image");
+          const projectData={
+              backgroundImage: container.style.backgroundImage,
+              content : container.innerHTML
+          };
+          
+          const projectJSON= JSON.stringify(projectData); 
+          const blob=new Blob([projectJSON], {type:"application/json"});
+          const url= URL.createObjectURL(blob); 
+          const a=document.createElement("a");
+          
+          a.href=url; 
+          a.download ="projet.json"; 
+          a.click(); 
+          
+          URL.revokeObjectURL(url); 
+      }
+
+      // Load project
+      function loadProject(){
+          const input=document.createElement("input"); 
+          input.type ="file"; 
+          input.accept=".json"; 
+
+          input.onchange=function(event){
+              const file=event.target.files[0]; 
+              const reader=new FileReader(); 
+              reader.onload = function (e) {
+    try {
+        // Correction ici : utiliser JSON.parse pour analyser les données
+        const projectData = JSON.parse(e.target.result);
+        
+        const container = document.getElementById("background-image");
+        container.style.backgroundImage = projectData.backgroundImage;
+        container.innerHTML = projectData.content;
+
+        // Réappliquer les fonctionnalités de drag et resize
+        $(".custom-div").draggable({ containment: "#background-image" }).resizable(); 
+    } catch (error) {
+        console.error("Erreur lors du chargement du projet:", error);
+        alert("Erreur lors du chargement du projet. Veuillez vérifier le fichier.");
+    }
+};
+reader.readAsText(file); 
+
+          };
+          
+          input.click(); 
+}
+
+// Handle keyboard events to delete the selected element
+document.addEventListener("keydown", function(event) {
+    if(event.key === "Delete" || event.key === "Backspace") {
+        if(activeDiv) {
+            activeDiv.remove(); 
+            activeDiv = null; 
+        }  
+    }  
+});
+
+   </script>  
+   </body>  
+   </html>  
