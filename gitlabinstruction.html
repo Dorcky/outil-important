@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur de Commandes Git</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Générateur de Commandes Git</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="gitForm" class="mb-4">
+                            <div class="mb-3">
+                                <label for="repoName" class="form-label">Nom du Repository (ex: team/project):</label>
+                                <input type="text" class="form-control" id="repoName" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="branch" class="form-label">Branch:</label>
+                                <select class="form-select" id="branch">
+                                    <option value="main">main</option>
+                                    <option value="master">master</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="commitMessage" class="form-label">Message du Commit:</label>
+                                <input type="text" class="form-control" id="commitMessage" required>
+                            </div>
+
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="useSSH">
+                                <label class="form-check-label" for="useSSH">Utiliser SSH au lieu de HTTPS</label>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100">Générer les Commandes</button>
+                        </form>
+
+                        <div id="commandsOutput" class="d-none">
+                            <h3 class="h5 mb-3">Commandes Git:</h3>
+                            <div id="commandsList"></div>
+                            <div class="alert alert-info mt-4" role="alert">
+                                Exécutez ces commandes dans l'ordre pour initialiser votre repository et pousser vos changements.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('gitForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const repoName = document.getElementById('repoName').value;
+            const branch = document.getElementById('branch').value;
+            const commitMessage = document.getElementById('commitMessage').value;
+            const useSSH = document.getElementById('useSSH').checked;
+
+            const commands = [
+                `git init`,
+                useSSH 
+                    ? `git remote add origin git@gitlab.com:${repoName}.git`
+                    : `git remote add origin https://gitlab.com/${repoName}.git`,
+                'git add .',
+                `git commit -m "${commitMessage}"`,
+                `git push -u origin ${branch}`
+            ];
+
+            const commandsList = document.getElementById('commandsList');
+            commandsList.innerHTML = '';
+            commands.forEach(cmd => {
+                const cmdDiv = document.createElement('div');
+                cmdDiv.className = 'd-flex align-items-center mb-2';
+                cmdDiv.innerHTML = `
+                    <code class="flex-grow-1 p-2 bg-light rounded">${cmd}</code>
+                    <button class="btn btn-outline-secondary ms-2" onclick="copyCommand('${cmd}')" title="Copier">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                `;
+                commandsList.appendChild(cmdDiv);
+            });
+
+            document.getElementById('commandsOutput').classList.remove('d-none');
+        });
+
+        function copyCommand(cmd) {
+            navigator.clipboard.writeText(cmd).then(() => {
+                alert('Commande copiée !');
+            });
+        }
+    </script>
+</body>
+</html>
